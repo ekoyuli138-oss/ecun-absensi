@@ -1,0 +1,1650 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Absensi QR - Ecun</title>
+
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+
+  <!-- QR Scanner -->
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <!-- QR Code Generator -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
+      display: flex;
+      min-height: 100vh;
+      background-color: #F8F9FA;
+      color: #343A40;
+    }
+
+    /* Sidebar Menu */
+    #sidebar {
+      width: 260px;
+      background: #25324D;
+      color: #F8F9FA;
+      padding: 2rem 1.5rem;
+      position: fixed;
+      height: 100vh;
+      overflow-y: auto;
+      box-shadow: 4px 0 20px rgba(0, 0, 0, 0.08);
+      z-index: 1000;
+    }
+    #sidebar h2 {
+      text-align: center;
+      font-size: 1.5rem;
+      font-weight: 600;
+      margin-bottom: 2.5rem;
+      letter-spacing: -0.5px;
+      color: #E9ECEF;
+    }
+    .menu-btn {
+      display: flex;
+      align-items: center;
+      width: 100%;
+      margin: 0.75rem 0;
+      padding: 1rem 1.25rem;
+      background: transparent;
+      border: none;
+      color: #E9ECEF;
+      text-align: left;
+      border-radius: 12px;
+      cursor: pointer;
+      font-size: 1rem;
+      font-weight: 500;
+      transition: all 0.3s ease;
+      gap: 12px;
+    }
+    .menu-btn:hover {
+      background: rgba(255, 255, 255, 0.1);
+      transform: translateX(4px);
+    }
+    .menu-btn.active {
+      background: rgba(255, 255, 255, 0.15);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      color: #FFFFFF;
+    }
+
+    /* Konten Utama */
+    #main-content {
+      margin-left: 260px;
+      padding: 2rem;
+      width: calc(100% - 260px);
+      overflow-x: hidden;
+    }
+
+    .page { display: none; }
+    .page.active { display: block; }
+
+    /* Umum */
+    h1, h2, h3, h4 {
+      font-weight: 600;
+      color: #25324D;
+      margin-bottom: 1.5rem;
+      line-height: 1.3;
+    }
+    h1 { font-size: 1.8rem; }
+    h2 { font-size: 1.6rem; }
+    h3 { font-size: 1.3rem; }
+    h4 { font-size: 1.1rem; }
+
+    button {
+      padding: 0.8rem 1.5rem;
+      margin: 0.5rem 0.5rem 0.5rem 0;
+      font-size: 0.95rem;
+      border: none;
+      border-radius: 12px;
+      cursor: pointer;
+      font-weight: 500;
+      transition: all 0.25s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .btn-primary { 
+      background: #4A90E2; 
+      color: white; 
+    }
+    .btn-success { 
+      background: #4CAF50; 
+      color: white; 
+    }
+    .btn-warning { 
+      background: #FF9800; 
+      color: white; 
+    }
+    .btn-info { 
+      background: #00BCD4; 
+      color: white; 
+    }
+    .btn-gray { 
+      background: #6C757D; 
+      color: white; 
+    }
+    .btn-danger { 
+      background: #f44336; 
+      color: white; 
+    }
+    button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 16px rgba(0,0,0,0.1);
+    }
+
+    /* Tabel */
+    table { 
+      width: 100%; 
+      margin-top: 1.5rem; 
+      border-collapse: collapse; 
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.05);
+    }
+    th, td { 
+      border: 1px solid #E9ECEF; 
+      padding: 1rem;
+      text-align: left;
+      font-size: 0.95rem;
+    }
+    th { 
+      background: #F8F9FA; 
+      font-weight: 600;
+      color: #25324D;
+    }
+    tr:nth-child(even) { background: #F8F9FA; }
+
+    /* Input */
+    .input-field {
+      display: block;
+      margin: 1rem 0;
+      padding: 1rem;
+      width: 100%;
+      max-width: 400px;
+      border: 1px solid #E9ECEF;
+      border-radius: 12px;
+      font-size: 1rem;
+      font-family: inherit;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+      transition: border-color 0.3s, box-shadow 0.3s;
+    }
+    .input-field:focus {
+      outline: none;
+      border-color: #4A90E2;
+      box-shadow: 0 4px 16px rgba(74, 144, 226, 0.15);
+    }
+
+    /* Login */
+    #loginPage {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: rgba(37, 50, 77, 0.95);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      z-index: 2000;
+      backdrop-filter: blur(8px);
+    }
+    #loginPage.hidden { display: none; }
+    #loginPage .card {
+      background: white;
+      padding: 2.5rem;
+      border-radius: 20px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+      width: 100%;
+      max-width: 400px;
+      text-align: center;
+    }
+    #loginPage h2 {
+      color: #25324D;
+      margin-bottom: 2rem;
+      font-size: 1.8rem;
+    }
+    #loginPage button {
+      width: 100%;
+      margin: 0.75rem 0;
+    }
+
+    /* Grafik sederhana */
+    .chart-container {
+      background: white;
+      padding: 1.5rem;
+      border-radius: 16px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.06);
+      margin-bottom: 1.5rem;
+    }
+    .bar-item {
+      margin: 1rem 0;
+    }
+    .bar-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.95rem;
+      margin-bottom: 0.5rem;
+      color: #495057;
+    }
+    .bar {
+      height: 24px;
+      background: #4A90E2;
+      border-radius: 12px;
+      width: 0%;
+      transition: width 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+      box-shadow: 0 4px 12px rgba(74, 144, 226, 0.2);
+    }
+
+    /* Layout Horizontal untuk Grafik Dashboard */
+    .dashboard-charts {
+      display: flex;
+      gap: 2rem;
+      margin-top: 2rem;
+      flex-wrap: wrap;
+    }
+    .chart-wrapper {
+      flex: 1;
+      min-width: 280px;
+      background: white;
+      padding: 1.75rem;
+      border-radius: 18px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.06);
+    }
+    .chart-wrapper h4 {
+      text-align: center;
+      margin-bottom: 1.5rem;
+      color: #25324D;
+      font-size: 1.2rem;
+      font-weight: 600;
+    }
+
+    /* Form Upload & Manual */
+    .form-section {
+      margin: 1.5rem 0;
+      padding: 1.75rem;
+      background: white;
+      border-radius: 18px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.05);
+    }
+
+    /* Kelas untuk menyembunyikan elemen */
+    .hidden { display: none; }
+
+    /* Styling untuk QR Scanner */
+    #qr-reader { 
+      width: 100%; 
+      max-width: 500px; 
+      margin: 2rem auto;
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 12px 40px rgba(0,0,0,0.1);
+    }
+    #qr-reader-results { 
+      margin-top: 1.5rem; 
+      padding: 1.25rem; 
+      background: #E8F5E9; 
+      border-radius: 12px; 
+      word-break: break-all;
+      border-left: 4px solid #4CAF50;
+    }
+
+    /* Styling untuk Generate QR Code */
+    .qr-container { 
+      display: inline-block; 
+      margin: 1rem; 
+      text-align: center; 
+      vertical-align: top; 
+      background: #F8F9FA;
+      padding: 1rem;
+      border-radius: 14px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.05);
+    }
+    .qr-code { 
+      margin-bottom: 0.75rem; 
+      background: white;
+      padding: 0.5rem;
+      border-radius: 10px;
+    }
+    .qr-label { 
+      font-size: 0.85rem; 
+      color: #495057;
+      word-break: break-all;
+    }
+    .qr-sticker { 
+      width: 100px; 
+      height: 100px; 
+      margin: 0.5rem;
+      background: white;
+      padding: 0.5rem;
+      border-radius: 10px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    .qr-sticker-label { 
+      font-size: 0.7em; 
+      color: #495057;
+      word-break: break-all;
+    }
+
+    /* Gaya cetak */
+    @media print {
+        body { background: white; }
+        #sidebar, .menu-btn, .btn, .form-section, .input-field, #scanSection, #chart-container, #reportSection, #reportTable, .btn-gray { display: none !important; }
+        #allQRCodesSection, #allQRCodesContainer, .qr-container, .qr-sticker, .qr-sticker-label { display: block !important; }
+        #allQRCodesSection { display: block !important; margin: 0; padding: 10px; }
+        .qr-container { margin: 5px; }
+    }
+
+    /* Badge & Status */
+    .badge {
+      display: inline-block;
+      padding: 0.3rem 0.7rem;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      font-weight: 500;
+      margin-left: 0.5rem;
+    }
+    .badge-success { background: #D4EDDA; color: #155724; }
+    .badge-warning { background: #FFF3CD; color: #856404; }
+    .badge-danger { background: #F8D7DA; color: #721C24; }
+
+    /* Footer */
+    .footer {
+      margin-top: 3rem;
+      text-align: center;
+      color: #6C757D;
+      font-size: 0.85rem;
+    }
+
+    /* Animasi Loading */
+    .loading {
+      animation: pulse 1.5s infinite;
+    }
+    @keyframes pulse {
+      0% { opacity: 0.6; }
+      50% { opacity: 1; }
+      100% { opacity: 0.6; }
+    }
+
+    /* Hover efek card */
+    .card-hover:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 16px 48px rgba(0,0,0,0.12);
+    }
+
+    /* Notifikasi */
+    .notification {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      padding: 1rem 1.5rem;
+      background: #4CAF50;
+      color: white;
+      border-radius: 12px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+      z-index: 9999;
+      opacity: 0;
+      transform: translateY(-20px);
+      transition: all 0.3s ease;
+    }
+    .notification.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    /* Tab Login/Registrasi */
+    .login-tab {
+      display: flex;
+      border-bottom: 2px solid #dee2e6;
+      margin-bottom: 1.5rem;
+    }
+    .tab-btn {
+      padding: 0.75rem 1.5rem;
+      background: #f8f9fa;
+      border: none;
+      border-radius: 8px 8px 0 0;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .tab-btn.active {
+      background: #fff;
+      border-bottom: 2px solid #4A90E2;
+      color: #4A90E2;
+    }
+    .tab-content {
+      display: none;
+    }
+    .tab-content.active {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Notifikasi -->
+  <div id="notification" class="notification">Notifikasi</div>
+
+  <!-- Halaman Login Overlay -->
+  <div id="loginPage">
+    <div class="card">
+      <h2>🔐 Login Absensi</h2>
+
+      <!-- Tab Login / Registrasi -->
+      <div class="login-tab">
+        <button class="tab-btn active" onclick="switchTab('loginTab')">Login</button>
+        <button class="tab-btn" onclick="switchTab('registerTab')">Daftar Baru</button>
+      </div>
+
+      <!-- Tab Login -->
+      <div id="loginTab" class="tab-content active">
+        <input type="text" id="username" class="input-field" placeholder="Email" />
+        <input type="password" id="password" class="input-field" placeholder="Password" />
+        <button class="btn-success" onclick="login()">Masuk</button>
+        <br><br>
+        <button class="btn-warning" onclick="showForgot()">Lupa Password?</button>
+      </div>
+
+      <!-- Tab Registrasi -->
+      <div id="registerTab" class="tab-content">
+        <input type="text" id="regEmail" class="input-field" placeholder="Email Anda" />
+        <input type="password" id="regPassword" class="input-field" placeholder="Password Baru" />
+        <input type="password" id="regConfirmPassword" class="input-field" placeholder="Konfirmasi Password" />
+        <button class="btn-info" onclick="register()">Buat Akun Baru</button>
+        <br><br>
+        <p style="color: #6C757D; font-size: 0.9rem;">Dengan mendaftar, Anda menyetujui kebijakan privasi kami.</p>
+      </div>
+
+      <div id="forgotSection" style="display:none; margin-top: 20px; color: #E9ECEF;">
+        <p>Silakan hubungi administrator untuk reset password.</p>
+        <button onclick="hideForgot()" style="margin-top: 10px; background: #6C757D;">Tutup</button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Sidebar Menu -->
+  <div id="sidebar">
+    <h2>🏫 Ecun Absensi</h2>
+    <button class="menu-btn active" onclick="showPage('dashboard')"><span>📊</span> Dashboard</button>
+    <button class="menu-btn" onclick="showPage('students')"><span>👥</span> Daftar Siswa</button>
+    <button class="menu-btn" onclick="showPage('reports')"><span>📥</span> Laporan Absensi</button>
+    <button class="menu-btn" onclick="logout()"><span>🚪</span> Logout</button>
+  </div>
+
+  <!-- Konten Utama -->
+  <div id="main-content">
+
+    <!-- Dashboard -->
+    <div id="dashboard" class="page active">
+      <h2>📊 Dashboard Kehadiran</h2>
+      <p style="color: #6C757D; margin-bottom: 2rem;">Lihat ringkasan kehadiran siswa secara real-time</p>
+
+      <!-- Bagian Scan QR Code -->
+      <div id="scanSection" class="card-hover">
+        <h3>📷 Scan QR Code Absensi</h3>
+        <div id="qr-reader" style="width: 100%;"></div>
+        <div id="qr-reader-results"></div>
+        <div id="scanControls">
+          <button id="startScannerBtn" class="btn-success" onclick="startScanner()">▶️ Mulai Scanner</button>
+          <button id="stopScannerBtn" class="btn-danger hidden" onclick="stopScanner()">⏹️ Berhenti</button>
+        </div>
+      </div>
+
+      <!-- --- Grafik Harian, Mingguan, Bulanan Secara Horizontal --- -->
+      <div class="dashboard-charts">
+        <!-- Grafik Harian -->
+        <div class="chart-wrapper">
+          <h4>📅 Harian</h4>
+          <div id="dailyChart" class="chart-container">
+            <p class="loading">Memuat data hari ini...</p>
+          </div>
+        </div>
+
+        <!-- Grafik Mingguan -->
+        <div class="chart-wrapper">
+          <h4>📆 Mingguan (6 Hari)</h4>
+          <div id="weeklyChart" class="chart-container">
+            <p class="loading">Memuat data mingguan...</p>
+          </div>
+        </div>
+
+        <!-- Grafik Bulanan -->
+        <div class="chart-wrapper">
+          <h4>🗓️ Bulanan</h4>
+          <div id="monthlyChart" class="chart-container">
+            <p class="loading">Memuat data bulan ini...</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- --- Tambahkan Tombol Reset dan Lanjut Semester --- -->
+      <div style="margin-top: 2.5rem; padding: 2rem; background: #F8F9FA; border-radius: 20px; border: 1px solid #E9ECEF;">
+        <h3>🔄 Pengelolaan Semester</h3>
+        <p style="color: #6C757D; margin-bottom: 1.5rem;">Kelola data semester dengan aman</p>
+        <button class="btn-warning" onclick="confirmResetSemester()">🔄 Reset Semester (Hapus Semua)</button>
+        <button class="btn-info" onclick="confirmLanjutSemester()">⏭️ Lanjut Semester (Hapus Absensi)</button>
+        <p style="margin-top: 1rem; font-size: 0.9rem; color: #856404; line-height: 1.5;">
+          <strong>Reset Semester:</strong> Menghapus SEMUA data (siswa & absensi) untuk memulai dari awal.<br>
+          <strong>Lanjut Semester:</strong> Hanya menghapus data absensi, data siswa tetap tersimpan.
+        </p>
+      </div>
+
+      <div class="footer">
+        © 2025 Ecun Absensi — Sistem Terintegrasi untuk Guru Modern
+      </div>
+    </div>
+
+    <!-- Daftar Siswa -->
+    <div id="students" class="page">
+      <h2>👥 Daftar Siswa</h2>
+      <p style="color: #6C757D; margin-bottom: 1.5rem;">Kelola data siswa dengan mudah</p>
+
+      <div>
+        <button class="btn-info" onclick="showUpload()">📁 Upload Siswa</button>
+        <button class="btn-success" onclick="showAddManual()">➕ Tambah Manual</button>
+        <button class="btn-warning" onclick="downloadTemplate()">📥 Download Template</button>
+        <button class="btn-primary" onclick="generateAllQRCodes()">🖨️ Cetak Semua QR Stiker</button>
+      </div>
+
+      <!-- Form Upload -->
+      <div id="uploadSection" class="hidden form-section">
+        <h3>Upload File Siswa (.xls/.csv)</h3>
+        <input type="file" id="fileUpload" class="input-field" accept=".xls,.xlsx,.csv" />
+        <button class="btn-primary" onclick="parseUpload()">Proses File</button>
+        <button class="btn-gray" onclick="hideUpload()">Batal</button>
+      </div>
+
+      <!-- Form Manual -->
+      <div id="addManualSection" class="hidden form-section">
+        <h3>Tambah Siswa Manual</h3>
+        <input type="text" id="nisnInput" class="input-field" placeholder="NISN" />
+        <input type="text" id="namaInput" class="input-field" placeholder="Nama Lengkap" />
+        <input type="text" id="kelasInput" class="input-field" placeholder="Kelas" />
+        <button class="btn-success" onclick="addManual()">Tambah Siswa</button>
+        <button class="btn-gray" onclick="hideAddManual()">Batal</button>
+      </div>
+
+      <!-- Tabel Siswa -->
+      <table>
+        <thead>
+          <tr>
+            <th>NISN</th>
+            <th>Nama</th>
+            <th>Kelas</th>
+            <th>Aksi</th>
+          </tr>
+        </thead>
+        <tbody id="studentTableBody"></tbody>
+      </table>
+
+      <!-- Bagian Generate QR Code Per Siswa -->
+      <div id="qrCodeSection" class="hidden form-section">
+        <h3>QR Code Siswa</h3>
+        <div id="qrCodeContainer"></div>
+        <button class="btn-gray" onclick="hideQRCodes()">Tutup</button>
+      </div>
+
+      <!-- Bagian Cetak Semua QR Stiker -->
+      <div id="allQRCodesSection" class="hidden form-section">
+        <h3>Semua QR Stiker Siswa</h3>
+        <p style="color: #6C757D; margin-bottom: 1rem;">Gunakan tombol print browser (Ctrl+P) untuk mencetak semua stiker.</p>
+        <div id="allQRCodesContainer"></div>
+        <button class="btn-gray" onclick="hideAllQRCodes()">Tutup</button>
+      </div>
+    </div>
+
+    <!-- Laporan Absensi -->
+    <div id="reports" class="page">
+      <h2>📥 Laporan Absensi</h2>
+      <p style="color: #6C757D; margin-bottom: 1.5rem;">Pilih periode untuk melihat dan mengunduh laporan kehadiran</p>
+
+      <div>
+        <button class="btn-primary" onclick="loadReport('hari')">📆 Harian</button>
+        <button class="btn-primary" onclick="loadReport('minggu')">📅 Mingguan (6 Hari)</button>
+        <button class="btn-primary" onclick="showMonthSelector()">🗓️ Bulanan</button>
+        <button class="btn-primary" onclick="showSemesterSelector()">📚 Semesteran</button>
+      </div>
+
+      <!-- Tabel Hasil Laporan -->
+      <div id="reportSection" class="hidden">
+        <h3>Hasil Laporan</h3>
+        <!-- Tambahkan div untuk ringkasan periode tertentu -->
+        <div id="periodicSummarySection" class="hidden form-section">
+          <h4>Ringkasan Kehadiran</h4>
+          <table id="periodicSummaryTable">
+            <thead>
+              <tr>
+                <th>NISN</th>
+                <th>Nama</th>
+                <th>Kelas</th>
+                <th>Jumlah Hadir</th>
+              </tr>
+            </thead>
+            <tbody id="periodicSummaryTableBody"></tbody>
+          </table>
+          <hr>
+        </div>
+        <!-- /Tambahkan div untuk ringkasan periode tertentu -->
+
+        <!-- Tabel Detail Absensi -->
+        <div id="detailReportSection" class="hidden form-section">
+          <h4>Detail Absensi</h4>
+          <table id="reportTable">
+            <thead>
+              <tr>
+                <th>Tanggal</th>
+                <th>NISN</th>
+                <th>Nama</th>
+                <th>Kelas</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="reportTableBody"></tbody>
+          </table>
+        </div>
+        <!-- /Tabel Detail Absensi -->
+
+        <!-- Opsi Download Bulanan -->
+        <div id="monthDownloadSection" class="hidden form-section">
+          <h3>Download Laporan Bulanan</h3>
+          <select id="monthSelect" class="input-field">
+            <!-- Opsi akan diisi oleh JavaScript -->
+          </select>
+          <button class="btn-success" onclick="downloadMonthlyReport()">📥 Download Laporan Bulan Ini</button>
+          <button class="btn-gray" onclick="hideMonthDownload()">Batal</button>
+        </div>
+
+        <!-- Opsi Download Semesteran -->
+        <div id="semesterDownloadSection" class="hidden form-section">
+          <h3>Download Laporan Semesteran</h3>
+          <select id="semesterSelect" class="input-field">
+            <option value="1">Semester 1 (Juli - Desember)</option>
+            <option value="2">Semester 2 (Januari - Juni)</option>
+          </select>
+          <button class="btn-success" onclick="downloadSemesterReport()">📥 Download Laporan Semester Ini</button>
+          <button class="btn-gray" onclick="hideSemesterDownload()">Batal</button>
+        </div>
+
+        <!-- Tombol download umum untuk harian dan mingguan -->
+        <button id="generalDownloadBtn" class="btn-success" onclick="downloadCurrentReport()" style="margin-top: 1.5rem;">📥 Download Laporan Ini</button>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    // --- Firebase Konfigurasi ---
+    const firebaseConfig = {
+      apiKey: "AIzaSyBgfqgHuvSCV2jf0MU49vZO5dln53d1mQ8",
+      authDomain: "ecun-absensi.firebaseapp.com",
+      databaseURL: "https://ecun-absensi-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId: "ecun-absensi",
+      storageBucket: "ecun-absensi.firebasestorage.app",
+      messagingSenderId: "907797438541",
+      appId: "1:907797438541:web:a16a3dce47354bc2dd7c04",
+      measurementId: "G-PFYXW9J3Y3"
+    };
+
+    // Inisialisasi Firebase
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.database();
+
+    // Variabel global
+    let siswaData = [];
+    let absensiData = [];
+
+    // --- Fungsi Notifikasi ---
+    function showNotification(message, duration = 3000) {
+      const notification = document.getElementById("notification");
+      notification.textContent = message;
+      notification.classList.add("show");
+      setTimeout(() => {
+        notification.classList.remove("show");
+      }, duration);
+    }
+
+    // --- Fungsi Switch Tab Login/Registrasi ---
+    function switchTab(tabId) {
+      document.querySelectorAll(".tab-content").forEach(el => el.classList.remove("active"));
+      document.querySelectorAll(".tab-btn").forEach(btn => btn.classList.remove("active"));
+      document.getElementById(tabId).classList.add("active");
+      document.querySelector(`.tab-btn[onclick="switchTab('${tabId}')"]`).classList.add("active");
+    }
+
+    // --- Login ---
+    function login() {
+      const email = document.getElementById("username").value;
+      const password = document.getElementById("password").value;
+
+      if (!email || !password) {
+        showNotification("Email dan password wajib diisi!", 4000);
+        return;
+      }
+
+      auth.signInWithEmailAndPassword(email, password)
+        .then((userCredential) => {
+          // User berhasil login
+          showNotification("Login berhasil! Selamat datang.", 3000);
+          document.getElementById("loginPage").classList.add("hidden");
+          showPage('dashboard');
+          loadData(); // Muat data setelah login
+        })
+        .catch((error) => {
+          console.error("Error login:", error);
+          showNotification(`Login gagal: ${error.message}`, 5000);
+        });
+    }
+
+    // --- Registrasi ---
+    function register() {
+      const email = document.getElementById("regEmail").value;
+      const password = document.getElementById("regPassword").value;
+      const confirmPassword = document.getElementById("regConfirmPassword").value;
+
+      if (!email || !password || !confirmPassword) {
+        showNotification("Semua kolom wajib diisi!", 4000);
+        return;
+      }
+
+      if (password !== confirmPassword) {
+        showNotification("Password dan konfirmasi tidak cocok!", 4000);
+        return;
+      }
+
+      auth.createUserWithEmailAndPassword(email, password)
+        .then((userCredential) => {
+          // User berhasil dibuat
+          showNotification("Akun berhasil dibuat! Silakan login.", 3000);
+          // Pindah ke tab login
+          switchTab('loginTab');
+          // Isi field login dengan email yang baru dibuat
+          document.getElementById("username").value = email;
+          document.getElementById("password").value = "";
+        })
+        .catch((error) => {
+          console.error("Error registrasi:", error);
+          showNotification(`Registrasi gagal: ${error.message}`, 5000);
+        });
+    }
+
+    function logout() {
+      auth.signOut().then(() => {
+        // Kosongkan data lokal
+        siswaData = [];
+        absensiData = [];
+        // Tampilkan halaman login
+        document.getElementById("loginPage").classList.remove("hidden");
+        document.getElementById("username").value = "";
+        document.getElementById("password").value = "";
+        showNotification("Anda telah logout.", 3000);
+      }).catch((error) => {
+        showNotification(`Logout gagal: ${error.message}`, 5000);
+      });
+    }
+
+    // --- Load Data dari Firebase ---
+    function loadData() {
+      const userId = auth.currentUser.uid;
+      const userRef = db.ref(`users/${userId}`);
+
+      userRef.once('value')
+        .then((snapshot) => {
+          const data = snapshot.val();
+          if (data) {
+            siswaData = data.siswaData || [];
+            absensiData = data.absensiData || [];
+            loadDashboard();
+            updateStudentList();
+            showNotification("Data berhasil dimuat dari cloud.", 3000);
+          } else {
+            // Jika belum ada data, buat struktur dasar
+            siswaData = [];
+            absensiData = [];
+            saveDataToFirebase(); // Simpan struktur kosong
+            showNotification("Data baru dibuat untuk Anda.", 3000);
+          }
+        })
+        .catch((error) => {
+          console.error("Error loading data:", error);
+          showNotification(`Gagal memuat data: ${error.message}`, 5000);
+        });
+    }
+
+    // --- Simpan Data ke Firebase ---
+    function saveDataToFirebase() {
+      const userId = auth.currentUser.uid;
+      const userRef = db.ref(`users/${userId}`);
+
+      userRef.set({
+        siswaData: siswaData,
+        absensiData: absensiData
+      })
+      .then(() => {
+        showNotification("Data berhasil disimpan ke cloud.", 3000);
+      })
+      .catch((error) => {
+        console.error("Error saving data:", error);
+        showNotification(`Gagal menyimpan data: ${error.message}`, 5000);
+      });
+    }
+
+    // --- Navigasi Menu ---
+    function showPage(pageId) {
+      document.querySelectorAll(".page").forEach(el => el.classList.remove("active"));
+      document.querySelectorAll(".menu-btn").forEach(btn => btn.classList.remove("active"));
+      document.getElementById(pageId).classList.add("active");
+      document.querySelector(`.menu-btn[onclick="showPage('${pageId}')"]`).classList.add("active");
+
+      if (pageId === 'students') {
+        updateStudentList();
+      } else if (pageId === 'dashboard') {
+        loadDashboard();
+      }
+    }
+
+    // --- Daftar Siswa ---
+    function updateStudentList() {
+      const tbody = document.getElementById("studentTableBody");
+      tbody.innerHTML = "";
+      siswaData.forEach(s => {
+        tbody.innerHTML += `
+          <tr>
+            <td>${s.nisn}</td>
+            <td>${s.nama}</td>
+            <td>${s.kelas}</td>
+            <td>
+              <button class="btn-info" onclick="generateSingleQRCode('${s.nisn}', '${s.nama}', '${s.kelas}')">📋 QR</button>
+            </td>
+          </tr>`;
+      });
+    }
+
+    function showUpload() {
+      document.getElementById("uploadSection").classList.remove("hidden");
+      document.getElementById("addManualSection").classList.add("hidden");
+      document.getElementById("qrCodeSection").classList.add("hidden");
+      document.getElementById("allQRCodesSection").classList.add("hidden");
+    }
+    function hideUpload() {
+      document.getElementById("uploadSection").classList.add("hidden");
+      document.getElementById("fileUpload").value = "";
+    }
+    function showAddManual() {
+      document.getElementById("addManualSection").classList.remove("hidden");
+      document.getElementById("uploadSection").classList.add("hidden");
+      document.getElementById("qrCodeSection").classList.add("hidden");
+      document.getElementById("allQRCodesSection").classList.add("hidden");
+    }
+    function hideAddManual() {
+      document.getElementById("addManualSection").classList.add("hidden");
+      document.getElementById("nisnInput").value = "";
+      document.getElementById("namaInput").value = "";
+      document.getElementById("kelasInput").value = "";
+    }
+
+    function downloadTemplate() {
+      const content = "NISN\tNama Lengkap\tKelas\n1234567890\tContoh Nama\tXII-A\n";
+      const blob = new Blob([content], { type: "application/vnd.ms-excel" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "template_siswa.xls";
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function parseUpload() {
+      const fileInput = document.getElementById("fileUpload");
+      const file = fileInput.files[0];
+
+      if (!file) {
+        showNotification("Silakan pilih file terlebih dahulu.", 4000);
+        return;
+      }
+
+      const reader = new FileReader();
+
+      reader.onload = function(e) {
+        const content = e.target.result;
+        const lines = content.split("\n");
+
+        const newSiswa = [];
+        let headerSkipped = false;
+
+        for (let line of lines) {
+          if (!headerSkipped) {
+            headerSkipped = true;
+            continue;
+          }
+
+          if (line.trim() === "") continue;
+
+          let parts = line.split("\t");
+          if (parts.length < 3) parts = line.split(",");
+
+          if (parts.length >= 3 && parts[0].trim() && parts[1].trim() && parts[2].trim()) {
+            newSiswa.push({
+              nisn: parts[0].trim(),
+              nama: parts[1].trim(),
+              kelas: parts[2].trim()
+            });
+          }
+        }
+
+        if (newSiswa.length === 0) {
+          showNotification("Tidak ditemukan data siswa yang valid dalam file.", 5000);
+          return;
+        }
+
+        const updatedSiswaData = [...siswaData];
+        newSiswa.forEach(newS => {
+          const existingIndex = updatedSiswaData.findIndex(s => s.nisn === newS.nisn);
+          if (existingIndex > -1) {
+            updatedSiswaData[existingIndex] = newS;
+          } else {
+            updatedSiswaData.push(newS);
+          }
+        });
+
+        siswaData = updatedSiswaData;
+        saveDataToFirebase(); // Simpan ke Firebase
+        updateStudentList();
+        showNotification(`Berhasil memproses ${newSiswa.length} siswa.`, 4000);
+        hideUpload();
+      };
+
+      reader.onerror = function() {
+        showNotification("Terjadi kesalahan saat membaca file.", 5000);
+      };
+
+      reader.readAsText(file);
+    }
+
+    function addManual() {
+      const nisn = document.getElementById("nisnInput").value.trim();
+      const nama = document.getElementById("namaInput").value.trim();
+      const kelas = document.getElementById("kelasInput").value.trim();
+      if (!nisn || !nama || !kelas) { 
+        showNotification("Semua kolom wajib diisi!", 4000); 
+        return; 
+      }
+      if (siswaData.some(s => s.nisn === nisn)) { 
+        showNotification("NISN sudah ada!", 4000); 
+        return; 
+      }
+      siswaData.push({ nisn, nama, kelas });
+      saveDataToFirebase(); // Simpan ke Firebase
+      updateStudentList();
+      showNotification("Siswa berhasil ditambahkan.", 3000);
+      hideAddManual();
+    }
+
+    // --- Generate QR Code ---
+    function generateSingleQRCode(nisn, nama, kelas) {
+        const container = document.getElementById("qrCodeContainer");
+        container.innerHTML = "";
+
+        const qrDiv = document.createElement("div");
+        qrDiv.className = "qr-container";
+
+        const qrLabel = document.createElement("div");
+        qrLabel.className = "qr-label";
+        qrLabel.textContent = `NISN: ${nisn}\nNama: ${nama}\nKelas: ${kelas}`;
+
+        const qrCodeDiv = document.createElement("div");
+        qrCodeDiv.id = "qr-code-single";
+        qrCodeDiv.className = "qr-code";
+
+        qrDiv.appendChild(qrCodeDiv);
+        qrDiv.appendChild(qrLabel);
+        container.appendChild(qrDiv);
+
+        new QRCode(qrCodeDiv, {
+            text: nisn,
+            width: 128,
+            height: 128,
+            correctLevel: QRCode.CorrectLevel.H
+        });
+
+        document.getElementById("qrCodeSection").classList.remove("hidden");
+        document.getElementById("uploadSection").classList.add("hidden");
+        document.getElementById("addManualSection").classList.add("hidden");
+        document.getElementById("allQRCodesSection").classList.add("hidden");
+    }
+
+    function generateAllQRCodes() {
+        const container = document.getElementById("allQRCodesContainer");
+        container.innerHTML = "";
+
+        if (siswaData.length === 0) {
+            showNotification("Tidak ada data siswa untuk dibuatkan QR code.", 4000);
+            return;
+        }
+
+        const promises = siswaData.map(s => {
+            return new Promise((resolve, reject) => {
+                const qrDiv = document.createElement("div");
+                qrDiv.className = "qr-container";
+
+                const qrLabel = document.createElement("div");
+                qrLabel.className = "qr-sticker-label";
+                qrLabel.textContent = `${s.nama}\n${s.kelas}\n${s.nisn}`;
+
+                const qrCodeDiv = document.createElement("div");
+                qrCodeDiv.className = "qr-sticker";
+
+                qrDiv.appendChild(qrCodeDiv);
+                qrDiv.appendChild(qrLabel);
+                container.appendChild(qrDiv);
+
+                const qrcode = new QRCode(qrCodeDiv, {
+                    text: s.nisn,
+                    width: 100,
+                    height: 100,
+                    correctLevel: QRCode.CorrectLevel.H
+                });
+
+                setTimeout(() => resolve(), 50);
+            });
+        });
+
+        Promise.all(promises).then(() => {
+            document.getElementById("allQRCodesSection").classList.remove("hidden");
+            document.getElementById("uploadSection").classList.add("hidden");
+            document.getElementById("addManualSection").classList.add("hidden");
+            document.getElementById("qrCodeSection").classList.add("hidden");
+            document.getElementById("allQRCodesSection").scrollIntoView({ behavior: 'smooth' });
+        }).catch(error => {
+            console.error("Error generating QR codes:", error);
+            showNotification("Terjadi kesalahan saat membuat QR code.", 5000);
+        });
+    }
+
+    function hideQRCodes() {
+        document.getElementById("qrCodeSection").classList.add("hidden");
+        document.getElementById("qrCodeContainer").innerHTML = "";
+    }
+
+    function hideAllQRCodes() {
+        document.getElementById("allQRCodesSection").classList.add("hidden");
+        document.getElementById("allQRCodesContainer").innerHTML = "";
+    }
+
+    // --- Format Tanggal ---
+    function formatDate(d) {
+      const date = new Date(d);
+      return `${date.getDate().toString().padStart(2,'0')}/${(date.getMonth()+1).toString().padStart(2,'0')}/${date.getFullYear()}`;
+    }
+    function getWeekNumber(d) {
+      const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+      date.setUTCDate(date.getUTCDate() + 4 - (date.getUTCDay() || 7));
+      const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
+      return Math.ceil((((date - yearStart) / 86400000) + 1) / 7);
+    }
+    function getMonthYear(tgl) {
+      const [d, m, y] = tgl.split('/');
+      return `${m}/${y}`;
+    }
+    function getSemester(tgl) {
+      const [d, m, y] = tgl.split('/');
+      const bulan = parseInt(m);
+      const tahun = parseInt(y);
+      if (bulan >= 7) {
+        return `Semester 1 - ${tahun}/${tahun + 1}`;
+      } else {
+        return `Semester 2 - ${tahun - 1}/${tahun}`;
+      }
+    }
+
+    // --- Dashboard: Grafik Harian, Mingguan, Bulanan Otomatis ---
+    function loadDashboard() {
+      // --- Grafik Harian ---
+      const todayStr = formatDate(new Date());
+      const dataToday = absensiData.filter(r => r.tanggal === todayStr);
+
+      const summaryDaily = {};
+      dataToday.forEach(r => {
+        if (!summaryDaily[r.nisn]) summaryDaily[r.nisn] = { nama: r.nama, kelas: r.kelas, count: 0 };
+        summaryDaily[r.nisn].count++;
+      });
+
+      const dailyContainer = document.getElementById("dailyChart");
+      dailyContainer.innerHTML = "";
+
+      if (Object.keys(summaryDaily).length === 0) {
+        dailyContainer.innerHTML = "<p style='color: #6C757D; text-align: center;'>Tidak ada siswa yang hadir hari ini.</p>";
+        return;
+      }
+
+      const maxCountDaily = Math.max(...Object.values(summaryDaily).map(s => s.count), 1);
+      for (const nisn in summaryDaily) {
+        const s = summaryDaily[nisn];
+        const width = (s.count / maxCountDaily) * 100;
+        dailyContainer.innerHTML += `
+          <div class="bar-item">
+            <div class="bar-label">
+              <span><b>${s.nama}</b> (${s.kelas})</span>
+              <span>${s.count}x</span>
+            </div>
+            <div class="bar" style="width: ${Math.max(5, width)}%;"></div>
+          </div>
+        `;
+      }
+
+      // --- Grafik Mingguan (6 Hari Terakhir) ---
+      const now = new Date();
+      const sixDaysAgo = new Date();
+      sixDaysAgo.setDate(now.getDate() - 6);
+      const filteredWeekly = absensiData.filter(r => {
+        const recordDate = new Date(r.tanggal.split('/').reverse().join('-'));
+        return recordDate >= sixDaysAgo && recordDate <= now;
+      });
+
+      const summaryWeekly = {};
+      filteredWeekly.forEach(r => {
+        if (!summaryWeekly[r.nisn]) summaryWeekly[r.nisn] = { nama: r.nama, kelas: r.kelas, count: 0 };
+        summaryWeekly[r.nisn].count++;
+      });
+
+      const weeklyContainer = document.getElementById("weeklyChart");
+      weeklyContainer.innerHTML = "";
+
+      if (Object.keys(summaryWeekly).length === 0) {
+        weeklyContainer.innerHTML = "<p style='color: #6C757D; text-align: center;'>Tidak ada data kehadiran dalam 6 hari terakhir.</p>";
+        return;
+      }
+
+      const maxCountWeekly = Math.max(...Object.values(summaryWeekly).map(s => s.count), 1);
+      for (const nisn in summaryWeekly) {
+        const s = summaryWeekly[nisn];
+        const width = (s.count / maxCountWeekly) * 100;
+        weeklyContainer.innerHTML += `
+          <div class="bar-item">
+            <div class="bar-label">
+              <span><b>${s.nama}</b> (${s.kelas})</span>
+              <span>${s.count}x</span>
+            </div>
+            <div class="bar" style="width: ${Math.max(5, width)}%;"></div>
+          </div>
+        `;
+      }
+
+      // --- Grafik Bulanan ---
+      const currentMonth = getMonthYear(todayStr);
+      const dataThisMonth = absensiData.filter(r => getMonthYear(r.tanggal) === currentMonth);
+
+      const summaryMonthly = {};
+      dataThisMonth.forEach(r => {
+        if (!summaryMonthly[r.nisn]) summaryMonthly[r.nisn] = { nama: r.nama, kelas: r.kelas, count: 0 };
+        summaryMonthly[r.nisn].count++;
+      });
+
+      const monthlyContainer = document.getElementById("monthlyChart");
+      monthlyContainer.innerHTML = "";
+
+      if (Object.keys(summaryMonthly).length === 0) {
+        monthlyContainer.innerHTML = `<p style='color: #6C757D; text-align: center;'>Tidak ada data kehadiran pada bulan ${currentMonth}.</p>`;
+        return;
+      }
+
+      const maxCountMonthly = Math.max(...Object.values(summaryMonthly).map(s => s.count), 1);
+      for (const nisn in summaryMonthly) {
+        const s = summaryMonthly[nisn];
+        const width = (s.count / maxCountMonthly) * 100;
+        monthlyContainer.innerHTML += `
+          <div class="bar-item">
+            <div class="bar-label">
+              <span><b>${s.nama}</b> (${s.kelas})</span>
+              <span>${s.count}x</span>
+            </div>
+            <div class="bar" style="width: ${Math.max(5, width)}%;"></div>
+          </div>
+        `;
+      }
+    }
+
+    // --- Fungsi Reset dan Lanjut Semester ---
+    function confirmResetSemester() {
+      if (confirm("⚠️ PERINGATAN: Ini akan menghapus SEMUA data (Siswa dan Absensi). Apakah Anda yakin ingin memulai semester baru?")) {
+        resetSemester();
+      }
+    }
+
+    function confirmLanjutSemester() {
+      if (confirm("ℹ️ Ini akan menghapus hanya data ABSENSI. Data Siswa akan tetap tersimpan untuk semester berikutnya. Lanjutkan?")) {
+        lanjutSemester();
+      }
+    }
+
+    function resetSemester() {
+      siswaData = [];
+      absensiData = [];
+      saveDataToFirebase();
+      loadDashboard();
+      updateStudentList();
+      showNotification("✅ Semua data telah direset. Sistem siap untuk semester baru!", 5000);
+    }
+
+    function lanjutSemester() {
+      absensiData = [];
+      saveDataToFirebase();
+      loadDashboard();
+      showNotification("✅ Data absensi telah dihapus. Data siswa tetap tersimpan untuk semester berikutnya!", 5000);
+    }
+
+    // --- Laporan Absensi: Tampilkan dan Simpan Data ---
+    let currentReportData = [];
+    let currentPeriodicSummary = [];
+    let currentPeriod = { type: "", start: "", end: "" };
+
+    function loadReport(period) {
+      const now = new Date();
+      const todayStr = formatDate(now);
+      let filtered = [];
+
+      document.getElementById("periodicSummarySection").classList.add("hidden");
+      document.getElementById("detailReportSection").classList.add("hidden");
+      document.getElementById("monthDownloadSection").classList.add("hidden");
+      document.getElementById("semesterDownloadSection").classList.add("hidden");
+      document.getElementById("generalDownloadBtn").classList.remove("hidden");
+      currentPeriodicSummary = [];
+      currentPeriod = { type: "", start: "", end: "" };
+
+      if (period === 'hari') {
+        filtered = absensiData.filter(r => r.tanggal === todayStr);
+        document.getElementById("detailReportSection").classList.remove("hidden");
+      } else if (period === 'minggu') {
+        const sixDaysAgo = new Date();
+        sixDaysAgo.setDate(now.getDate() - 6);
+        const startDateStr = formatDate(sixDaysAgo);
+        const endDateStr = todayStr;
+
+        currentPeriod = { type: 'mingguan', start: startDateStr, end: endDateStr };
+
+        filtered = absensiData.filter(r => {
+          const recordDate = new Date(r.tanggal.split('/').reverse().join('-'));
+          return recordDate >= sixDaysAgo && recordDate <= now;
+        });
+
+        const summaryMap = {};
+        filtered.forEach(r => {
+            if (!summaryMap[r.nisn]) {
+                summaryMap[r.nisn] = {
+                    nisn: r.nisn,
+                    nama: r.nama,
+                    kelas: r.kelas,
+                    count: 0
+                };
+            }
+            summaryMap[r.nisn].count++;
+        });
+
+        const sortedSummary = Object.values(summaryMap).sort((a, b) => b.count - a.count);
+        currentPeriodicSummary = sortedSummary;
+
+        const summaryTbody = document.getElementById("periodicSummaryTableBody");
+        summaryTbody.innerHTML = "";
+        if (sortedSummary.length > 0) {
+            sortedSummary.forEach(s => {
+                summaryTbody.innerHTML += `
+                  <tr>
+                    <td>${s.nisn}</td>
+                    <td>${s.nama}</td>
+                    <td>${s.kelas}</td>
+                    <td>${s.count} Hari</td>
+                  </tr>
+                `;
+            });
+            document.getElementById("periodicSummarySection").classList.remove("hidden");
+        } else {
+             summaryTbody.innerHTML = `<tr><td colspan="4">Tidak ada data kehadiran dalam 6 hari terakhir.</td></tr>`;
+             document.getElementById("periodicSummarySection").classList.remove("hidden");
+        }
+        document.getElementById("periodicSummaryTitle").textContent = `Ringkasan Kehadiran 6 Hari Terakhir: ${startDateStr} s/d ${endDateStr}`;
+      } else if (period === 'bulan') {
+        showMonthSelector();
+        return;
+      } else if (period === 'semester') {
+        showSemesterSelector();
+        return;
+      }
+
+      currentReportData = filtered;
+
+      const tbody = document.getElementById("reportTableBody");
+      tbody.innerHTML = "";
+
+      if (filtered.length === 0) {
+        if (!['minggu', 'bulan'].includes(period)) {
+            tbody.innerHTML = `<tr><td colspan="5">Tidak ada data absensi untuk periode ini.</td></tr>`;
+        }
+        document.getElementById("reportSection").classList.remove("hidden");
+        return;
+      }
+
+      if (['hari', 'semester', 'bulan'].includes(period)) {
+          filtered.sort((a, b) => new Date(b.tanggal.split('/').reverse().join('-')) - new Date(a.tanggal.split('/').reverse().join('-')));
+      }
+
+      filtered.forEach(r => {
+        tbody.innerHTML += `
+          <tr>
+            <td>${r.tanggal}</td>
+            <td>${r.nisn}</td>
+            <td>${r.nama}</td>
+            <td>${r.kelas}</td>
+            <td>${r.status}</td>
+          </tr>
+        `;
+      });
+
+      document.getElementById("reportSection").classList.remove("hidden");
+    }
+
+    function showMonthSelector() {
+      document.getElementById("periodicSummarySection").classList.add("hidden");
+      document.getElementById("detailReportSection").classList.add("hidden");
+      document.getElementById("monthDownloadSection").classList.add("hidden");
+      document.getElementById("semesterDownloadSection").classList.add("hidden");
+      document.getElementById("generalDownloadBtn").classList.add("hidden");
+
+      document.getElementById("monthDownloadSection").classList.remove("hidden");
+
+      const monthSelect = document.getElementById("monthSelect");
+      monthSelect.innerHTML = "";
+
+      const allMonths = new Set();
+      absensiData.forEach(record => {
+        const [day, month, year] = record.tanggal.split('/');
+        allMonths.add(`${month}/${year}`);
+      });
+
+      const sortedMonths = Array.from(allMonths).sort((a, b) => {
+        const [m1, y1] = a.split('/').map(Number);
+        const [m2, y2] = b.split('/').map(Number);
+        return (y2 * 12 + m2) - (y1 * 12 + m1);
+      });
+
+      const optionDefault = document.createElement("option");
+      optionDefault.value = "";
+      optionDefault.textContent = "Pilih Bulan...";
+      monthSelect.appendChild(optionDefault);
+
+      sortedMonths.forEach(monthYear => {
+        const option = document.createElement("option");
+        option.value = monthYear;
+        option.textContent = monthYear;
+        monthSelect.appendChild(option);
+      });
+
+      document.getElementById("reportSection").classList.remove("hidden");
+    }
+
+    function showSemesterSelector() {
+      document.getElementById("periodicSummarySection").classList.add("hidden");
+      document.getElementById("detailReportSection").classList.add("hidden");
+      document.getElementById("monthDownloadSection").classList.add("hidden");
+      document.getElementById("semesterDownloadSection").classList.add("hidden");
+      document.getElementById("generalDownloadBtn").classList.add("hidden");
+
+      document.getElementById("semesterDownloadSection").classList.remove("hidden");
+      document.getElementById("reportSection").classList.remove("hidden");
+    }
+
+    function downloadMonthlyReport() {
+      const monthSelect = document.getElementById("monthSelect");
+      const selectedMonthYear = monthSelect.value;
+
+      if (!selectedMonthYear) {
+        showNotification("Silakan pilih bulan terlebih dahulu.", 4000);
+        return;
+      }
+
+      const [selectedMonth, selectedYear] = selectedMonthYear.split('/').map(Number);
+      const startDate = new Date(selectedYear, selectedMonth - 1, 1);
+      const endDate = new Date(selectedYear, selectedMonth, 0);
+      const startDateStr = formatDate(startDate);
+      const endDateStr = formatDate(endDate);
+
+      const filtered = absensiData.filter(r => {
+        const recordDate = new Date(r.tanggal.split('/').reverse().join('-'));
+        return recordDate >= startDate && recordDate <= endDate;
+      });
+
+      const summaryMap = {};
+      filtered.forEach(r => {
+          if (!summaryMap[r.nisn]) {
+              summaryMap[r.nisn] = {
+                  nisn: r.nisn,
+                  nama: r.nama,
+                  kelas: r.kelas,
+                  count: 0
+              };
+          }
+          summaryMap[r.nisn].count++;
+      });
+
+      const sortedSummary = Object.values(summaryMap).sort((a, b) => b.count - a.count);
+
+      const filename = `laporan_ringkasan_bulanan_${selectedMonth}-${selectedYear}.xls`;
+      let content = `Ringkasan Kehadiran Bulan ${selectedMonth}/${selectedYear}: ${startDateStr} s/d ${endDateStr}\n`;
+      content += "NISN\tNama\tKelas\tJumlah Hadir\n";
+
+      sortedSummary.forEach(s => {
+        content += `${s.nisn}\t${s.nama}\t${s.kelas}\t${s.count} Hari\n`;
+      });
+
+      downloadFile(content, filename);
+    }
+
+    function downloadSemesterReport() {
+      const semesterSelect = document.getElementById("semesterSelect");
+      const selectedSemester = semesterSelect.value;
+
+      let startDate = null;
+      let endDate = null;
+      let startDateStr = "";
+      let endDateStr = "";
+      let semesterLabel = "";
+
+      if (selectedSemester === "1") {
+        const now = new Date();
+        const currentYear = now.getFullYear();
+        startDate = new Date(currentYear, 6, 1);
+        endDate = new Date(currentYear, 11, 31);
+        startDateStr = formatDate(startDate);
+        endDateStr = formatDate(endDate);
+        semesterLabel = "Semester 1";
+      } else if (selectedSemester === "2") {
+        const now = new Date();
+        const currentYear = now.getFullYear();
+        startDate = new Date(currentYear, 0, 1);
+        endDate = new Date(currentYear, 5, 30);
+        startDateStr = formatDate(startDate);
+        endDateStr = formatDate(endDate);
+        semesterLabel = "Semester 2";
+      }
+
+      const filtered = absensiData.filter(r => {
+        const recordDate = new Date(r.tanggal.split('/').reverse().join('-'));
+        return recordDate >= startDate && recordDate <= endDate;
+      });
+
+      const summaryMap = {};
+      filtered.forEach(r => {
+          if (!summaryMap[r.nisn]) {
+              summaryMap[r.nisn] = {
+                  nisn: r.nisn,
+                  nama: r.nama,
+                  kelas: r.kelas,
+                  count: 0
+              };
+          }
+          summaryMap[r.nisn].count++;
+      });
+
+      const sortedSummary = Object.values(summaryMap).sort((a, b) => b.count - a.count);
+
+      const filename = `laporan_ringkasan_semester_${selectedSemester}_${startDate.getFullYear()}.xls`;
+      let content = `Ringkasan Kehadiran ${semesterLabel} (${startDateStr} s/d ${endDateStr})\n`;
+      content += "NISN\tNama\tKelas\tJumlah Hadir\n";
+
+      sortedSummary.forEach(s => {
+        content += `${s.nisn}\t${s.nama}\t${s.kelas}\t${s.count} Hari\n`;
+      });
+
+      downloadFile(content, filename);
+    }
+
+    function hideMonthDownload() {
+      document.getElementById("monthDownloadSection").classList.add("hidden");
+      document.getElementById("generalDownloadBtn").classList.remove("hidden");
+      document.getElementById("reportSection").classList.remove("hidden");
+    }
+
+    function hideSemesterDownload() {
+      document.getElementById("semesterDownloadSection").classList.add("hidden");
+      document.getElementById("generalDownloadBtn").classList.remove("hidden");
+      document.getElementById("reportSection").classList.remove("hidden");
+    }
+
+    function downloadCurrentReport() {
+      if (currentReportData.length === 0 && currentPeriodicSummary.length === 0) {
+        showNotification("Tidak ada data untuk diunduh. Silakan pilih periode terlebih dahulu.", 5000);
+        return;
+      }
+
+      const now = new Date();
+      const todayStr = formatDate(now);
+      let filename = "";
+      let content = "";
+
+      if (currentPeriodicSummary.length > 0 && currentPeriod.type) {
+        let periodLabel = currentPeriod.type === 'mingguan' ? 'mingguan' : 'bulanan';
+        let daysLabel = currentPeriod.type === 'mingguan' ? '6' : '31';
+
+        const startFormatted = currentPeriod.start.replace(/\//g, '-');
+        const endFormatted = currentPeriod.end.replace(/\//g, '-');
+        filename = `laporan_ringkasan_${periodLabel}_${startFormatted}_sampai_${endFormatted}.xls`;
+
+        content = `Ringkasan Kehadiran ${daysLabel} Hari Terakhir: ${currentPeriod.start} s/d ${currentPeriod.end}\n`;
+        content += "NISN\tNama\tKelas\tJumlah Hadir\n";
+
+        currentPeriodicSummary.forEach(s => {
+          content += `${s.nisn}\t${s.nama}\t${s.kelas}\t${s.count} Hari\n`;
+        });
+      } else {
+        filename = `laporan_absensi_${todayStr.replace(/\//g, '-')}.xls`;
+        content = "Tanggal\tNISN\tNama\tKelas\tStatus\n";
+        currentReportData.forEach(r => {
+          content += `${r.tanggal}\t${r.nisn}\t${r.nama}\t${r.kelas}\t${r.status}\n`;
+        });
+      }
+
+      downloadFile(content, filename);
+    }
+
+    function downloadFile(content, filename) {
+      const blob = new Blob([content], { type: "application/vnd.ms-excel" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    // --- QR Scanner ---
+    let html5QrcodeScanner;
+    let scannerActive = false;
+
+    function startScanner() {
+        if (scannerActive) return;
+
+        const qrReaderContainer = document.getElementById("qr-reader");
+        qrReaderContainer.innerHTML = "";
+
+        html5QrcodeScanner = new Html5QrcodeScanner(
+            "qr-reader", { fps: 10, qrbox: { width: 250, height: 250 } }, false
+        );
+        html5QrcodeScanner.render(onScanSuccess, onScanFailure);
+        document.getElementById("startScannerBtn").classList.add("hidden");
+        document.getElementById("stopScannerBtn").classList.remove("hidden");
+        scannerActive = true;
+    }
+
+    function stopScanner() {
+        if (!scannerActive) return;
+
+        html5QrcodeScanner.clear().then(() => {
+            document.getElementById("qr-reader").innerHTML = "";
+            document.getElementById("startScannerBtn").classList.remove("hidden");
+            document.getElementById("stopScannerBtn").classList.add("hidden");
+            scannerActive = false;
+        }).catch(error => {
+            console.error("Stop scanner error", error);
+            document.getElementById("qr-reader").innerHTML = "";
+            document.getElementById("startScannerBtn").classList.remove("hidden");
+            document.getElementById("stopScannerBtn").classList.add("hidden");
+            scannerActive = false;
+        });
+    }
+
+    function onScanSuccess(decodedText, decodedResult) {
+        const nisn = decodedText;
+        const siswa = siswaData.find(s => s.nisn === nisn);
+
+        if (siswa) {
+            const todayStr = formatDate(new Date());
+            const sudahAbsen = absensiData.some(a => a.nisn === nisn && a.tanggal === todayStr && a.status === "Hadir");
+            if (sudahAbsen) {
+                document.getElementById("qr-reader-results").innerHTML = `<p style="color: orange;">⚠️ ${siswa.nama} (${siswa.kelas}) sudah absen hari ini.</p>`;
+                return;
+            }
+
+            const record = {
+                tanggal: todayStr,
+                nisn: siswa.nisn,
+                nama: siswa.nama,
+                kelas: siswa.kelas,
+                status: "Hadir"
+            };
+            absensiData.push(record);
+            saveDataToFirebase(); // Simpan ke Firebase
+            document.getElementById("qr-reader-results").innerHTML = `<p style="color: green;">✅ ${siswa.nama} (${siswa.kelas}) telah absen.</p>`;
+            loadDashboard();
+        } else {
+            document.getElementById("qr-reader-results").innerHTML = `<p style="color: red;">❌ NISN tidak ditemukan: ${nisn}</p>`;
+        }
+    }
+
+    function onScanFailure(error) {
+        console.warn(`QR Scanning Error: ${error}`);
+    }
+
+    // --- Fungsi Tambahan ---
+    function showForgot() { document.getElementById("forgotSection").style.display = "block"; }
+    function hideForgot() { document.getElementById("forgotSection").style.display = "none"; }
+
+    // --- Auto-login jika sudah login sebelumnya ---
+    auth.onAuthStateChanged((user) => {
+      if (user) {
+        // User sudah login
+        document.getElementById("loginPage").classList.add("hidden");
+        showPage('dashboard');
+        loadData(); // Muat data
+      } else {
+        // Belum login
+        document.getElementById("loginPage").classList.remove("hidden");
+      }
+    });
+
+  </script>
+</body>
+</html>
